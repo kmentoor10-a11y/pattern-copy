@@ -11,16 +11,6 @@
       <section class="card">
         <h1>Pattern Copy Game</h1>
 
-        <div class="button-row">
-          <button id="startBtn" type="button">Start Game</button>
-          <button id="checkBtn" type="button">Check Pattern</button>
-          <button id="nextRoundBtn" type="button">Next Round</button>
-          <button id="saveBtn" type="button">Save Session</button>
-          <button id="loadBtn" type="button">Load Session</button>
-          <button id="resetBtn" type="button">Reset Game</button>
-          <button id="backBtn" type="button">Back to Settings</button>
-        </div>
-
         <div class="stats-grid game-stats-grid">
           <div class="stat-box">
             <span class="label">Player</span>
@@ -65,6 +55,18 @@
         <div id="gridArea" class="grid-area"></div>
       </section>
 
+      <section class="card controls-card">
+      <div class="button-row">
+          <button id="startBtn" type="button">Start Game</button>
+          <button id="checkBtn" type="button">Check Pattern</button>
+          <button id="nextRoundBtn" type="button">Next Round</button>
+          <button id="saveBtn" type="button">Save Session</button>
+          <button id="loadBtn" type="button">Load Session</button>
+          <button id="resetBtn" type="button">Reset Game</button>
+          <button id="backBtn" type="button">Back to Settings</button>
+        </div>
+        </section>
+
       <section class="card">
         <h2>Round Results</h2>
         <div id="resultsArea" class="results-area">No results yet.</div>
@@ -75,7 +77,20 @@
         <div id="logArea" class="log-area"></div>
       </section>
     </main>
+    
 
+    <!-- Change 5: Added game over modal -->
+    <div id="gameOverModal" class="game-over-modal hidden">
+      <div class="game-over-content">
+        <h2>Game Over</h2>
+
+        <p id="finalScoreText">Final Score: 0</p>
+        <p id="bestScoreText">Best Score: 0</p>
+        <p id="roundText">Rounds Survived: 0</p>
+
+        <button id="playAgainBtn">Play Again</button>
+      </div>
+    </div>
     <script src="game.js"></script>
   </body>
 </html>

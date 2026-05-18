@@ -5,7 +5,7 @@ const settings = JSON.parse(sessionStorage.getItem("settings"));
 // if no settings
 if (!settings) {
   alert("No settings found. Go back to launcher.");
-  window.close();
+  window.location.href = "index.html";
 }
 
 //player object
@@ -35,6 +35,7 @@ const gameState = {
   userPattern: [],
   gridSize: settings.gridSize,
   previewTime: getPreviewTime("settings.difficulty"),
+  combo: 0, //Update adding system
 };
 
 //DOM Elements
@@ -49,6 +50,13 @@ const loadBtn = document.getElementById("loadBtn");
 const messageArea = document.getElementById("messageArea");
 const timerBar = document.getElementById("timerBar");
 const gridArea = document.getElementById("gridArea");
+
+//update
+const gameOverModal = document.getElementById("gameOverModal");
+const finalScoreText = document.getElementById("finalScoreText");
+const bestScoreText = document.getElementById("bestScoreText");
+const roundText = document.getElementById("roundText");
+const playAgainBtn = document.getElementById("playAgainBtn");
 
 //Display Initial Information
 function updateDisplay() {
@@ -150,16 +158,25 @@ function generatePattern() {
 
   const totalCells = gameState.gridSize * gameState.gridSize;
 
-  //Pattern length increases with round
-  let length;
+  //Base difficulty starting point update
+  let baseLength;
 
   if (settings.difficulty === "easy") {
-    length = Math.max(2, gameState.round + 1);
+    baseLength = 2;
   } else if (settings.difficulty === "medium") {
-    length = Math.max(3, gameState.round + 2);
+    baseLength = 3;
   } else {
-    length = Math.max(4, gameState.round + 3);
+    baseLength = 4;
   }
+
+  //Growth slows over time (every 2 rounds)
+  const growth = Math.floor(gameState.round / 2);
+
+  //Max pattern is based on grid size (Important)
+  const maxLength = Math.floor(totalCells * 0.5);
+
+  //Final length calculation
+  let length = Math.min(maxLength, baseLength + growth);
 
   for (let i = 0; i < length; i++) {
     const randomIndex = Math.floor(Math.random() * totalCells);
@@ -171,6 +188,7 @@ function generatePattern() {
       i--; //retry
     }
   }
+
   console.log("Pattern:", gameState.pattern);
 }
 
@@ -195,24 +213,28 @@ function showPattern() {
     }
   });
 
-  //Timer Display
+  //Timer Display - Update Improving Timer Display
   if (settings.showPreviewTime) {
+    clearInterval(gameState.timerInterval);
+
+    timerBar.style.transition = "none";
     timerBar.style.width = "100%";
 
-    const interval = setInterval(() => {
+    setTimeout(() => {
+      timerBar.style.transition = "width 0.1s linear";
+    }, 10);
+
+    gameState.timerInterval = setInterval(() => {
       timeLeft -= 100;
 
-      const percentage = (timeLeft / TotalTime) * 100;
+      const percentage = (timeLeft / gameState.previewTime) * 100;
       timerBar.style.width = percentage + "%";
 
       if (timeLeft <= 0) {
-        clearInterval(interval);
+        clearInterval(gameState.timerInterval);
       }
     }, 100);
 
-    messageArea.textContent = "Memorise the pattern...";
-  } else {
-    timerBar.style.width = "0%";
     messageArea.textContent = "Memorise the pattern...";
   }
 
@@ -233,8 +255,30 @@ function hidePattern() {
     }
   });
 
+  //Change 1
+  /* Old hint system
+const hintCount = Math.max(1, Math.floor(gameState.pattern.length / 3));
+
+const hintTiles = shuffledPattern.slice(0, hintCount);
+*/
+
+  //Replaced with smart difficulty-based hint system
   if (settings.showHints) {
-    gameState.pattern.forEach((index) => {
+    let hintCount;
+
+    //Difficulty base hints
+    if (settings.difficulty === "easy") {
+      hintCount = Math.ceil(gameState.pattern.length * 0.4);
+    } else if (settings.difficulty === "medium") {
+      hintCount = Math.ceil(gameState.pattern.length * 0.25);
+    } else {
+      hintCount = 1;
+    }
+
+    // Reveal the START of the pattern
+    const hintTiles = gameState.pattern.slice(0, hintCount);
+
+    hintTiles.forEach((index) => {
       const cell = gridArea.children[index];
       cell.classList.add("hint");
     });
@@ -255,6 +299,7 @@ function startGame() {
   gameState.score = 0;
   gameState.lives = 3;
   gameState.userPattern = [];
+  gameState.combo = 0; //update combo system
 
   gameState.previewTime = getPreviewTime();
 
@@ -263,7 +308,8 @@ function startGame() {
   gridArea.innerHTML = "";
   createGrid();
 
-  setGameButtonsDisabled(false);
+  checkBtn.disabled = false;
+  nextRoundBtn.disabled = true;
 
   clearSelections();
 
@@ -305,6 +351,11 @@ function checkPattern() {
   } else {
     handleWrong();
   }
+
+  //Change 4: Unlock next round only after checking
+  checkBtn.disabled = true;
+  nextRoundBtn.disabled = false;
+  //End Change 4
 }
 
 function arraysMatch(arr1, arr2) {
@@ -338,15 +389,40 @@ function handleCorrect() {
     multiplier *= 1.5; //Increase score
   }
 
-  const points = Math.round(gameState.round * 10 * multiplier);
+  //Update
+  const comboBonus = 1 + gameState.combo * 0.2;
+  const basePoints = 10;
 
+  const roundBonus = 1 + gameState.round * 0.15;
+
+  const points = Math.round(basePoints * multiplier * comboBonus * roundBonus);
+  
   gameState.score += points;
+  gameState.combo++;
 
   let note = "";
   if (settings.showHints) note += " (Hints penalty)";
   if (settings.strictMode) note += " (Strict bonus)";
 
-  messageArea.textContent = "Correct!";
+  const successMessages = [
+    "Perfect!",
+    "Excellent memory!",
+    "Great job!",
+    "Pattern matched!",
+    "Nice work!",
+    "Impressive!",
+    "You got it!",
+  ];
+
+  const randomMessage =
+    successMessages[Math.floor(Math.random() * successMessages.length)];
+
+  if (gameState.combo >= 2) {
+    messageArea.textContent = `${randomMessage} COMBO x${gameState.combo}!`;
+  } else {
+    messageArea.textContent = randomMessage;
+  }
+
   highlightCells("correct");
 
   updateDisplay();
@@ -354,21 +430,42 @@ function handleCorrect() {
   resultsArea.textContent =
     `Round ${gameState.round}\n` +
     `Results: Correct\n` +
+    `Combo: x${gameState.combo}\n` +
     `Points: +${points}\n` +
     `Total Score: ${gameState.score}`;
 
-  addLog(`Round ${gameState.round}: Correct (+${points})`);
+  addLog(
+    `Round ${gameState.round}: Correct (+${points}) | Combo x${gameState.combo}`,
+  );
 }
 
 //Wrong Answer
 function handleWrong() {
   if (gameState.lives <= 0) return;
 
-  messageArea.textContent = "Wrong pattern!";
+  const failMessages = [
+    "Not quite!",
+    "Wrong Pattern",
+    "Try again!",
+    "Almost had it!",
+    "Pattern mismatch",
+    "Careful!",
+  ];
+
+  messageArea.textContent =
+    failMessages[Math.floor(Math.random() * failMessages.length)];
 
   gameState.lives--;
+  gameState.combo = 0;
 
   highlightCells("wrong");
+
+  //Update
+  gridArea.style.animation = "shake 0.35s";
+
+  setTimeout(() => {
+    gridArea.style.animation = "";
+  }, 350);
 
   updateDisplay();
 
@@ -396,12 +493,35 @@ function gameOver() {
 
   setGameButtonsDisabled(true);
 
-  alert("Game Over!");
-
   if (gameState.score > player.bestScore) {
     player.bestScore = gameState.score;
     document.cookie = `bestScore=${player.bestScore}`;
   }
+
+  finalScoreText.textContent = `Final Score: ${gameState.score}`;
+  bestScoreText.textContent = `Best Score: ${player.bestScore}`;
+  roundText.textContent = `Rounds Survived: ${gameState.round}`;
+
+  gameOverModal.classList.remove("hidden");
+
+  //Change 2: Added leaderboard storage system
+  let leaderboard = JSON.parse(localStorage.getItem("leaderboard")) || [];
+  //End Change 2
+
+  leaderboard.push({
+    name: player.name,
+    score: gameState.score,
+    difficulty: settings.difficulty,
+    gridSize: gameState.gridSize,
+    round: gameState.round,
+    date: new Date().toLocaleString(),
+  });
+
+  //Change 2: Save score to leaderboard
+  localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
+  //End Change 2
+
+  console.log(localStorage.getItem("leaderboard"));
 
   addLog(`Game over - Score: ${gameState.score}`);
 
@@ -441,7 +561,15 @@ function nextRound() {
   gameState.round++;
   gameState.userPattern = [];
   gameState.gameActive = false;
-  gameState.previewTime = getPreviewTime();
+
+  //Change 4: Prevent skipping rounds
+  checkBtn.disabled = false;
+  nextRoundBtn.disabled = true;
+  //End Change 4
+
+  const basePreview = getPreviewTime();
+
+  gameState.previewTime = Math.max(400, basePreview - gameState.round * 35);
 
   clearSelections();
 
@@ -520,7 +648,7 @@ loadBtn.addEventListener("click", () => {
 const backBtn = document.getElementById("backBtn");
 
 backBtn.addEventListener("click", () => {
-  window.close();
+  window.location.href = "index.html";
 });
 
 //Game Logs
@@ -543,3 +671,8 @@ function setGameButtonsDisabled(state) {
   checkBtn.disabled = state;
   nextRoundBtn.disabled = state;
 }
+
+playAgainBtn.addEventListener("click", () => {
+  gameOverModal.classList.add("hidden");
+  resetGame();
+});
